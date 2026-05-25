@@ -1,6 +1,6 @@
 [package]
 name = "bevy_replicon_matchbox"
-version = "0.16.1"
+version = "0.17.0"
 authors = ["Roger Kueng <rogerkueng@gmail.com>"]
 edition = "2024"
 description = "A matchbox backend for replicon, built for Bevy"
