@@ -60,8 +60,10 @@ fn update_peers(mut client: ResMut<MatchboxClient>, mut commands: Commands) {
         return;
     };
     for (peer_id, state) in peers {
-        if matches!(state, PeerState::Disconnected) && peer_id != host_peer_id {
-            trace!("host {} disconnected", peer_id);
+        // Host-authoritative: only the host's disconnect ends this session.
+        // Other peers in the matchbox mesh (co-joiners) come and go freely.
+        if peer_id == host_peer_id && matches!(state, PeerState::Disconnected) {
+            trace!("host {host_peer_id} disconnected");
             commands.remove_resource::<MatchboxClient>();
             return;
         }
