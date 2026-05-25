@@ -22,16 +22,19 @@ impl Plugin for RepliconMatchboxClientPlugin {
                 .in_set(ClientSystems::ReceivePackets),
         );
 
+        // Must run in PreUpdate (always), not Send - mirrors the server side
+        // so dropping the client transitions `ClientState` reliably.
+        app.add_systems(
+            PreUpdate,
+            set_disconnected
+                .in_set(ClientSystems::ReceivePackets)
+                .run_if(resource_removed::<MatchboxClient>),
+        );
         app.add_systems(
             PostUpdate,
-            (
-                set_disconnected
-                    .in_set(ClientSystems::Send)
-                    .run_if(resource_removed::<MatchboxClient>),
-                send_packets
-                    .in_set(ClientSystems::SendPackets)
-                    .run_if(not(no_host_defined).and(resource_exists::<MatchboxClient>)),
-            ),
+            send_packets
+                .in_set(ClientSystems::SendPackets)
+                .run_if(not(no_host_defined).and(resource_exists::<MatchboxClient>)),
         );
     }
 }

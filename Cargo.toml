@@ -26,18 +26,14 @@ serde = { version = "1.0", features = ["serde_derive"] }
 bytes = "1.10"
 
 [dev-dependencies]
-bevy = { version = "0.16", default-features = false, features = [
-  "bevy_gizmos",
+# Trimmed to what the `backend` test needs (state machine + Transform
+# replication). The example-only render/UI features (bevy_ui, bevy_text,
+# default_font, x11, …) come back when the examples are ported off 0.34.
+bevy = { version = "0.18", default-features = false, features = [
   "bevy_state",
-  "bevy_text",
-  "bevy_ui_picking_backend",
-  "bevy_ui",
-  "bevy_window",
-  "default_font",
   "serialize",
-  "x11",
 ] }
-bevy_matchbox = { version = "0.12.0", features = ["signaling"] }
+bevy_matchbox = { version = "0.14", features = ["signaling"] }
 test-log = "0.2"
 serde = "1.0"
 clap = { version = "4.1", features = ["derive"] }

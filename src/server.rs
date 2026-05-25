@@ -23,6 +23,14 @@ impl Plugin for RepliconMatchboxServerPlugin {
                 .chain()
                 .in_set(ServerSystems::ReceivePackets),
         );
+        // Must run in PreUpdate (always), not Send (only on tick change) -
+        // otherwise stopping the server never transitions `ServerState`.
+        app.add_systems(
+            PreUpdate,
+            set_stopped
+                .in_set(ServerSystems::ReceivePackets)
+                .run_if(resource_removed::<MatchboxHost>),
+        );
         app.add_systems(
             PostUpdate,
             (
@@ -34,9 +42,6 @@ impl Plugin for RepliconMatchboxServerPlugin {
                     .run_if(resource_exists::<MatchboxHost>)
                     .after(update_client_presence)
                     .before(received_disconnect),
-                set_stopped
-                    .in_set(ServerSystems::Send)
-                    .run_if(resource_removed::<MatchboxHost>),
             ),
         );
     }
