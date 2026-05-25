@@ -146,11 +146,15 @@ fn receive_packets(
     for (channel_id, _) in channels.client_channels().iter().enumerate() {
         let socket_channel_id = 1 + channels.server_channels().len() + channel_id;
         for (id, packet) in server.socket.channel_mut(socket_channel_id).receive() {
-            let Some(client_entity) = server.client_entities.get(&id) else {
+            let Some(&client_entity) = server.client_entities.get(&id) else {
                 trace!("received packet from unknown client {}", id);
                 continue;
             };
-            messages.insert_received(*client_entity, channel_id, strip_marker(&packet));
+            if let Some(message) =
+                reassemble(&mut server.reassembly, id, socket_channel_id, &packet)
+            {
+                messages.insert_received(client_entity, channel_id, message);
+            }
         }
     }
 }
@@ -171,16 +175,17 @@ fn send_packets(
             continue;
         }
         trace!(
-            "sending packet to client {}: c:{} - {:?}",
+            "sending {} bytes to client {} on channel {}",
+            message.len(),
             client_entity,
-            channel_id,
-            add_marker(message.as_ref()).len()
+            channel_id
         );
         let socket_channel_id = 1 + channel_id;
-        server
-            .socket
-            .channel_mut(socket_channel_id)
-            .send(add_marker(message.as_ref()), connection.peer_id);
+        send_message(
+            server.socket.channel_mut(socket_channel_id),
+            connection.peer_id,
+            message.as_ref(),
+        );
     }
     let disconnect_ids: Vec<_> = server.clients_to_disconnect.drain(..).collect();
 
@@ -223,6 +228,8 @@ pub struct MatchboxHost {
     pub socket: MatchboxSocket,
     pub client_entities: HashMap<PeerId, Entity>,
     pub clients_to_disconnect: Vec<PeerId>,
+    /// In-flight multi-packet messages being reassembled, per (peer, channel).
+    reassembly: FragmentBuffers,
 }
 
 impl MatchboxHost {
@@ -234,9 +241,9 @@ impl MatchboxHost {
 
         Ok(Self {
             socket,
-            // unreliable_socket,
             client_entities: HashMap::new(),
             clients_to_disconnect: Vec::new(),
+            reassembly: HashMap::new(),
         })
     }
 

@@ -1,6 +1,7 @@
 use bevy::app::{PluginGroup, PluginGroupBuilder};
 use bevy_matchbox::MatchboxSocket;
-use bevy_matchbox::matchbox_socket::{ChannelConfig, Packet};
+use bevy_matchbox::matchbox_socket::{ChannelConfig, Packet, PeerId, WebRtcChannel};
+use std::collections::HashMap;
 use bevy_replicon::postcard;
 use bevy_replicon::prelude::{Channel, RepliconChannels};
 use bytes::Bytes;
@@ -80,24 +81,85 @@ pub(super) fn create_matchbox_socket(
 }
 
 #[cfg(feature = "server")]
-use bevy_matchbox::matchbox_socket::PeerId;
-#[cfg(feature = "server")]
 pub(super) fn uuid_to_u64_truncated(peer_id: PeerId) -> u64 {
     let bytes = peer_id.0.as_bytes();
     u64::from_le_bytes(bytes[0..8].try_into().unwrap())
 }
 
-///Marker added as matchbox seems to drop 0 sized packages
-pub(super) fn add_marker(data: &[u8]) -> Packet {
-    let mut payload = Vec::with_capacity(data.len() + 1);
-    payload.push(0);
-    payload.extend_from_slice(data);
-    payload.into()
+// Fragmentation. WebRTC/SCTP rejects any single message larger than its max
+// message size (64 KiB by default), but replicon hands large reliable messages
+// - chiefly the initial replication snapshot of a populated world - to the
+// backend whole, expecting it to split them (renet does). So we frame each
+// outbound message and split oversized ones across packets, reassembling on
+// receipt. The leading frame byte also serves the non-empty-message guard the
+// old marker byte provided (matchbox drops zero-length packets).
+//
+// Reassembly assumes in-order delivery, which holds for the reliable channels
+// where over-size messages occur. Messages on unreliable / unordered channels
+// are small (replicon caps them at the MTU) and always travel as one WHOLE
+// packet, so they never touch the reassembly buffer.
+
+/// Max payload bytes per packet - well under SCTP's 64 KiB ceiling.
+const MAX_FRAGMENT_PAYLOAD: usize = 16 * 1024;
+
+const FRAME_WHOLE: u8 = 0; // entire message in this one packet
+const FRAME_PART: u8 = 1; // a non-final fragment; more follow
+const FRAME_LAST: u8 = 2; // the final fragment of a multi-packet message
+
+/// Per-`(peer, channel)` accumulator for in-flight multi-packet messages.
+pub(super) type FragmentBuffers = HashMap<(PeerId, usize), Vec<u8>>;
+
+/// Send `data` to `peer` on `channel`, splitting it into framed packets when
+/// it exceeds [`MAX_FRAGMENT_PAYLOAD`]. Reassembled by [`reassemble`].
+pub(super) fn send_message(channel: &mut WebRtcChannel, peer: PeerId, data: &[u8]) {
+    if data.len() <= MAX_FRAGMENT_PAYLOAD {
+        channel.send(frame(FRAME_WHOLE, data), peer);
+        return;
+    }
+    let mut chunks = data.chunks(MAX_FRAGMENT_PAYLOAD).peekable();
+    while let Some(chunk) = chunks.next() {
+        let header = if chunks.peek().is_some() {
+            FRAME_PART
+        } else {
+            FRAME_LAST
+        };
+        channel.send(frame(header, chunk), peer);
+    }
 }
 
-///Marker stripped as matchbox seems to drop 0 sized packages
-pub(super) fn strip_marker(packet: &[u8]) -> Bytes {
-    Bytes::copy_from_slice(&packet[1..])
+fn frame(header: u8, payload: &[u8]) -> Packet {
+    let mut buf = Vec::with_capacity(payload.len() + 1);
+    buf.push(header);
+    buf.extend_from_slice(payload);
+    buf.into()
+}
+
+/// Feed a received packet into the `(peer, channel)` reassembly buffer.
+/// Returns the complete replicon message once its final fragment arrives, or
+/// `None` while a multi-packet message is still being assembled.
+pub(super) fn reassemble(
+    buffers: &mut FragmentBuffers,
+    peer: PeerId,
+    channel: usize,
+    packet: &[u8],
+) -> Option<Bytes> {
+    let (&header, payload) = packet.split_first()?;
+    match header {
+        FRAME_WHOLE => Some(Bytes::copy_from_slice(payload)),
+        FRAME_PART => {
+            buffers
+                .entry((peer, channel))
+                .or_default()
+                .extend_from_slice(payload);
+            None
+        }
+        FRAME_LAST => {
+            let mut message = buffers.remove(&(peer, channel)).unwrap_or_default();
+            message.extend_from_slice(payload);
+            Some(Bytes::from(message))
+        }
+        _ => None, // unknown frame header; drop
+    }
 }
 
 pub(super) fn to_packet<'a, T: Serialize>(msg: &T, buf: &'a mut [u8]) -> &'a [u8] {

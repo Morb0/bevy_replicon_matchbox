@@ -118,19 +118,18 @@ fn receive_packets(
     }
 
     for (channel_id, _) in channels.server_channels().iter().enumerate() {
-        //server socket channels are the same as the channel id +1 for the system channel
+        // Server socket channels are offset by 1 for the system channel.
         let socket_channel_id = 1 + channel_id;
-        let Ok(channel) = client.socket.get_channel_mut(socket_channel_id) else {
-            continue;
+        let packets = match client.socket.get_channel_mut(socket_channel_id) {
+            Ok(channel) => channel.receive(),
+            Err(_) => continue,
         };
-        for (id, packet) in channel.receive() {
-            trace!(
-                "client received packet from peer {}, c:{} size {}",
-                id,
-                channel_id,
-                packet.len()
-            );
-            messages.insert_received(channel_id, strip_marker(packet.as_ref()));
+        for (id, packet) in packets {
+            if let Some(message) =
+                reassemble(&mut client.reassembly, id, socket_channel_id, &packet)
+            {
+                messages.insert_received(channel_id, message);
+            }
         }
     }
 }
@@ -153,10 +152,11 @@ fn send_packets(
     for (channel_id, message) in messages.drain_sent() {
         //client socket channels are offset by the server channel length + 1 for the system channel
         let socket_channel_id = 1 + channels.server_channels().len() + channel_id;
-        client
-            .socket
-            .channel_mut(socket_channel_id)
-            .send(add_marker(message.as_ref()), host_peer_id);
+        send_message(
+            client.socket.channel_mut(socket_channel_id),
+            host_peer_id,
+            message.as_ref(),
+        );
     }
 
     if client.should_disconnect {
@@ -172,6 +172,8 @@ pub struct MatchboxClient {
     pub socket: MatchboxSocket,
     pub host_peer_id: Option<PeerId>,
     should_disconnect: bool,
+    /// In-flight multi-packet messages from the host being reassembled.
+    reassembly: FragmentBuffers,
 }
 
 impl MatchboxClient {
@@ -184,6 +186,7 @@ impl MatchboxClient {
             socket,
             host_peer_id: None,
             should_disconnect: false,
+            reassembly: FragmentBuffers::default(),
         })
     }
 
