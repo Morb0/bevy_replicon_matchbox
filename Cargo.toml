@@ -19,14 +19,14 @@ include = ["/src", "/tests", "/examples", "LICENSE*"]
 
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = ["bevy_log"] }
-bevy_replicon = { version = "0.40", default-features = false }
-bevy_matchbox = "0.14"
+bevy = { version = "0.19", default-features = false, features = ["bevy_log"] }
+bevy_replicon = { version = "0.41", default-features = false }
+bevy_matchbox = { git = "https://github.com/Morb0/matchbox.git", branch = "bevy-0.19" }
 serde = { version = "1.0", features = ["serde_derive"] }
 bytes = "1.10"
 
 [dev-dependencies]
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
   "bevy_gizmos",
   "bevy_picking",
   "bevy_state",
@@ -37,7 +37,7 @@ bevy = { version = "0.18", default-features = false, features = [
   "serialize",
   "x11",
 ] }
-bevy_matchbox = { version = "0.14", features = ["signaling"] }
+bevy_matchbox = { git = "https://github.com/Morb0/matchbox.git", branch = "bevy-0.19", features = ["signaling"] }
 test-log = "0.2"
 serde = "1.0"
 clap = { version = "4.1", features = ["derive"] }

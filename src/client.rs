@@ -34,7 +34,7 @@ impl Plugin for RepliconMatchboxClientPlugin {
             PostUpdate,
             send_packets
                 .in_set(ClientSystems::SendPackets)
-                .run_if(not(no_host_defined).and(resource_exists::<MatchboxClient>)),
+                .run_if(not(no_host_defined).and_then(resource_exists::<MatchboxClient>)),
         );
     }
 }
