@@ -399,7 +399,7 @@ fn setup_server(app: &mut App, port: u16) {
     let room_url = format!("ws://localhost:{port}/TestRoom");
     let channels = app.world().resource::<RepliconChannels>();
 
-    let server = MatchboxHost::new(room_url, channels).unwrap();
+    let server = MatchboxHost::new(room_url, channels, RtcIceServerConfig::default()).unwrap();
 
     app.insert_resource(server);
 }
@@ -407,7 +407,7 @@ fn setup_server(app: &mut App, port: u16) {
 fn setup_client(app: &mut App, port: u16) {
     let room_url = format!("ws://localhost:{port}/TestRoom");
     let channels = app.world().resource::<RepliconChannels>();
-    let client = MatchboxClient::new(room_url, channels).unwrap();
+    let client = MatchboxClient::new(room_url, channels, RtcIceServerConfig::default()).unwrap();
     app.insert_resource(client);
 }
 

@@ -9,7 +9,9 @@ use bevy::{
 };
 use bevy_matchbox::matchbox_signaling::SignalingServer;
 use bevy_replicon::prelude::*;
-use bevy_replicon_matchbox::{MatchboxClient, MatchboxHost, RepliconMatchboxPlugins};
+use bevy_replicon_matchbox::{
+    MatchboxClient, MatchboxHost, RepliconMatchboxPlugins, RtcIceServerConfig,
+};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -62,7 +64,7 @@ fn read_cli(mut commands: Commands, cli: Res<Cli>, channels: Res<RepliconChannel
             start_signaling_server(&mut commands, port);
             let room_url = format!("ws://localhost:{port}/simple-box");
 
-            let server = MatchboxHost::new(room_url, &channels)?;
+            let server = MatchboxHost::new(room_url, &channels, RtcIceServerConfig::default())?;
             commands.insert_resource(server);
             commands.spawn((
                 Text::new("Server"),
@@ -83,7 +85,7 @@ fn read_cli(mut commands: Commands, cli: Res<Cli>, channels: Res<RepliconChannel
             info!("connecting to port {port}");
             let room_url = format!("ws://localhost:{port}/simple-box");
 
-            let client = MatchboxClient::new(room_url, &channels)?;
+            let client = MatchboxClient::new(room_url, &channels, RtcIceServerConfig::default())?;
             commands.insert_resource(client);
             commands.spawn((
                 Text::new("Client"),

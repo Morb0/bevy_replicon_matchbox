@@ -16,7 +16,9 @@ use bevy::{
 };
 use bevy_matchbox::matchbox_signaling::SignalingServer;
 use bevy_replicon::prelude::*;
-use bevy_replicon_matchbox::{MatchboxClient, MatchboxHost, RepliconMatchboxPlugins};
+use bevy_replicon_matchbox::{
+    MatchboxClient, MatchboxHost, RepliconMatchboxPlugins, RtcIceServerConfig,
+};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -107,7 +109,7 @@ fn read_cli(
 
             start_signaling_server(&mut commands, port);
             let room_url = format!("ws://localhost:{port}/tic-tac-toe");
-            let server = MatchboxHost::new(room_url, &channels)?;
+            let server = MatchboxHost::new(room_url, &channels, RtcIceServerConfig::default())?;
             commands.insert_resource(server);
 
             commands.spawn((LocalPlayer, symbol));
@@ -116,7 +118,7 @@ fn read_cli(
             info!("connecting to port {port}");
 
             let room_url = format!("ws://localhost:{port}/tic-tac-toe");
-            let client = MatchboxClient::new(room_url, &channels)?;
+            let client = MatchboxClient::new(room_url, &channels, RtcIceServerConfig::default())?;
             commands.insert_resource(client);
 
             commands.spawn((LocalPlayer, ClientPlayer));
