@@ -11,4 +11,4 @@ pub use client::*;
 pub use server::*;
 
 #[cfg(any(feature = "client", feature = "server"))]
-pub use shared::RepliconMatchboxPlugins;
+pub use shared::{RepliconMatchboxPlugins, RtcIceServerConfig};

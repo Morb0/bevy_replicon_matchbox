@@ -236,8 +236,9 @@ impl MatchboxHost {
     pub fn new(
         room_url: impl Into<String>,
         replicon_channels: &RepliconChannels,
+        ice_server: RtcIceServerConfig,
     ) -> io::Result<Self> {
-        let socket = create_matchbox_socket(room_url, replicon_channels);
+        let socket = create_matchbox_socket(room_url, replicon_channels, ice_server);
 
         Ok(Self {
             socket,

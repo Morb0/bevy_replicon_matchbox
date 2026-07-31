@@ -1,6 +1,7 @@
 use bevy::app::{PluginGroup, PluginGroupBuilder};
 use bevy_matchbox::MatchboxSocket;
 use bevy_matchbox::matchbox_socket::{ChannelConfig, Packet, PeerId, WebRtcChannel};
+pub use bevy_matchbox::matchbox_socket::RtcIceServerConfig;
 use std::collections::HashMap;
 use bevy_replicon::postcard;
 use bevy_replicon::prelude::{Channel, RepliconChannels};
@@ -56,8 +57,10 @@ impl<'a> RepliconChannelsExt<'a> for RepliconChannels {
 pub(super) fn create_matchbox_socket(
     room_url: impl Into<String>,
     replicon_channels: &RepliconChannels,
+    ice_server: RtcIceServerConfig,
 ) -> MatchboxSocket {
-    let mut web_rtc_socket = bevy_matchbox::matchbox_socket::WebRtcSocketBuilder::new(room_url);
+    let mut web_rtc_socket =
+        bevy_matchbox::matchbox_socket::WebRtcSocketBuilder::new(room_url).ice_server(ice_server);
     //add system channel
     web_rtc_socket = web_rtc_socket.add_reliable_channel();
     for &channel in replicon_channels.all_channels() {
